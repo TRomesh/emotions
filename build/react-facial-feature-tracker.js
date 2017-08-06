@@ -86,7 +86,7 @@
 
 	// import PubSub from 'pubsub-js';
 
-	//  Cross-Browser Implementierung von der URL-Funktion, eher unwichtig
+	//  Cross-browser implementation of the URL function, rather unimportant
 	window.URL = window.URL || window.webkitURL || window.msURL || window.mozURL;
 
 	var ReactFacialFeatureTracker = function (_React$Component) {
@@ -109,28 +109,26 @@
 	  _createClass(ReactFacialFeatureTracker, [{
 	    key: "componentDidMount",
 	    value: function componentDidMount() {
-	      // overlayCC ist im Prinzip eine leere Ebene zum zeichnen, soweit ich das verstanden
+	      // OverlayCC is basically a blank layer to draw as far as I understand
 	      var overlayCC = this.overlay.getContext("2d");
 
-	      // Der emotionClassifier wird erstellt und wird mit einem emotionModel initiert.
-	      // Der Classifier ist im Prinzip der Rechner
-	      // Das emotionModel ist quasi das Wörterbuch für die Werte und die Emotionen
+	      // The emotion classifier is created and is initiated with an emotion model.
+	      // The classifier is in principle the computer
+	      // The emotionModel is almost the dictionary for values and emotions
 	      var ec = new _emotionclassifier2.default();
 	      ec.init(_emotionmodel2.default);
 
-	      // wir erstellen hier mal ein Emotion-Wörterbuch was auf null gesetzt ist. Diese Variable wird zum Zwischenspeichern der Werte genutzt.
+	      // We create here an Emotion dictionary which is set to zero. This variable is used to temporarily store the values.
 	      var emotionData = ec.getBlank();
 
-	      // Browser fragt jetzt nach der Webcam
-	      // die Funktion braucht folgende Argumente navigator.getUserMedia(optionen, success);
+	      // Browser is now asking for the webcam
+	      // The function needs the following arguments: navigator.getUserMedia (options, success);
 	      (0, _getusermedia2.default)({ video: true }, this.getUserMediaCallback.bind(this));
 
-	      //
-	      // Hier wird das Tracking an sich implmentiert
-	      //
+	      // Here tracking is implied
 	      var ctrack = new _clmtrackr2.default.tracker({ useWebGL: true });
 
-	      // der Tracker wird mit dem pModel initiiert. magic! :)
+	      // The tracker is initiated with the pModel.
 	      ctrack.init(_pmodel2.default);
 
 	      this.ctrack = ctrack;
@@ -155,11 +153,11 @@
 	  }, {
 	    key: "getUserMediaCallback",
 	    value: function getUserMediaCallback(err, stream) {
-	      // Damit es auch auf allen Browsern funktioniert
-	      // technisch wichtig, aber eher unwichtig für das Tracking
+	      // So it works on all browsers
+	      // Technically important, but rather unimportant for tracking
 	      this.video.src = window.URL && window.URL.createObjectURL(stream) || stream;
 
-	      // Um sicher zu gehen, dass das Video auch wirklich abgespielt wird.
+	      // To make sure that the video is actually played.
 	      this.video.play();
 	    }
 	  }, {
@@ -177,20 +175,18 @@
 	    value: function drawLoop() {
 	      requestAnimationFrame(this.drawLoop.bind(this));
 
-	      // Die numerischen Parameter
+	      // The numeric parameters
 	      var cp = this.ctrack.getCurrentParameters();
 
-	      // bei jedem Frame wird Ebene geleert
-	      // Probier mal die untere Zeile auszukommentieren
+	      // At each frame, level is emptied Try the bottom line out
 	      this.overlayCC.clearRect(0, 0, 400, 300);
 
-	      // falls alles geklappt hat und es Emotion-Werte gibt
-	      // soll die Maske gezeichnet werden
+	      // If everything has worked out and there are emotion values, the mask should be drawn
 	      if (this.ctrack.getCurrentPosition()) {}
 	      //this.ctrack.draw(this.overlay);
 
 
-	      // Die Emotionen in darstellbare Form bringen
+	      // Bring the emotions into a representable form
 	      var er = this.ec.meanPredict(cp);
 
 	      if (er) {

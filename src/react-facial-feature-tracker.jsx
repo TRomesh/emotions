@@ -7,7 +7,7 @@ import clm from "clmtrackr/build/clmtrackr.js";
 import _ from "lodash";
 // import PubSub from 'pubsub-js';
 
-//  Cross-Browser Implementierung von der URL-Funktion, eher unwichtig
+//  Cross-browser implementation of the URL function, rather unimportant
 window.URL = window.URL || window.webkitURL || window.msURL || window.mozURL;
 
 class ReactFacialFeatureTracker extends React.Component {
@@ -22,28 +22,26 @@ class ReactFacialFeatureTracker extends React.Component {
   }
 
   componentDidMount() {
-    // overlayCC ist im Prinzip eine leere Ebene zum zeichnen, soweit ich das verstanden
+    // OverlayCC is basically a blank layer to draw as far as I understand
     let overlayCC = this.overlay.getContext("2d");
 
-    // Der emotionClassifier wird erstellt und wird mit einem emotionModel initiert.
-    // Der Classifier ist im Prinzip der Rechner
-    // Das emotionModel ist quasi das Wörterbuch für die Werte und die Emotionen
+    // The emotion classifier is created and is initiated with an emotion model.
+    // The classifier is in principle the computer
+    // The emotionModel is almost the dictionary for values and emotions
     let ec = new emotionClassifier();
     ec.init(emotionModel);
 
-    // wir erstellen hier mal ein Emotion-Wörterbuch was auf null gesetzt ist. Diese Variable wird zum Zwischenspeichern der Werte genutzt.
+    // We create here an Emotion dictionary which is set to zero. This variable is used to temporarily store the values.
     let emotionData = ec.getBlank();
 
-    // Browser fragt jetzt nach der Webcam
-    // die Funktion braucht folgende Argumente navigator.getUserMedia(optionen, success);
+    // Browser is now asking for the webcam
+    // The function needs the following arguments: navigator.getUserMedia (options, success);
     getUserMedia({ video: true }, this.getUserMediaCallback.bind(this));
 
-    //
-    // Hier wird das Tracking an sich implmentiert
-    //
+    // Here tracking is implied
     let ctrack = new clm.tracker({ useWebGL: true });
 
-    // der Tracker wird mit dem pModel initiiert. magic! :)
+    // The tracker is initiated with the pModel.
     ctrack.init(pModel);
 
     this.ctrack = ctrack;
@@ -66,12 +64,12 @@ class ReactFacialFeatureTracker extends React.Component {
   }
 
   getUserMediaCallback(err, stream) {
-    // Damit es auch auf allen Browsern funktioniert
-    // technisch wichtig, aber eher unwichtig für das Tracking
+    // So it works on all browsers
+    // Technically important, but rather unimportant for tracking
     this.video.src =
       (window.URL && window.URL.createObjectURL(stream)) || stream;
 
-    // Um sicher zu gehen, dass das Video auch wirklich abgespielt wird.
+    // To make sure that the video is actually played.
     this.video.play();
   }
 
@@ -87,20 +85,18 @@ class ReactFacialFeatureTracker extends React.Component {
   drawLoop() {
     requestAnimationFrame(this.drawLoop.bind(this));
 
-    // Die numerischen Parameter
+    // The numeric parameters
     let cp = this.ctrack.getCurrentParameters();
 
-    // bei jedem Frame wird Ebene geleert
-    // Probier mal die untere Zeile auszukommentieren
+    // At each frame, level is emptied Try the bottom line out
     this.overlayCC.clearRect(0, 0, 400, 300);
 
-    // falls alles geklappt hat und es Emotion-Werte gibt
-    // soll die Maske gezeichnet werden
+    // If everything has worked out and there are emotion values, the mask should be drawn
     if (this.ctrack.getCurrentPosition()) {
       //this.ctrack.draw(this.overlay);
     }
 
-    // Die Emotionen in darstellbare Form bringen
+    // Bring the emotions into a representable form
     let er = this.ec.meanPredict(cp);
 
     if (er) {
