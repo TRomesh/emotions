@@ -1,141 +1,137 @@
-import React from 'react';
-import getUserMedia from 'getusermedia';
-import emotionClassifier from './models/emotionclassifier.js';
-import emotionModel from './models/emotionmodel.js';
-import pModel from './models/pmodel.js';
-import clm from 'clmtrackr/clmtrackr.js';
-import _ from 'lodash';
+import React from "react";
+import getUserMedia from "getusermedia";
+import emotionClassifier from "./models/emotionclassifier.js";
+import emotionModel from "./models/emotionmodel.js";
+import pModel from "./models/pmodel.js";
+import clm from "clmtrackr/build/clmtrackr.js";
+import _ from "lodash";
 // import PubSub from 'pubsub-js';
 
 //  Cross-Browser Implementierung von der URL-Funktion, eher unwichtig
-window.URL = window.URL ||
-window.webkitURL ||
-window.msURL ||
-window.mozURL;
+window.URL = window.URL || window.webkitURL || window.msURL || window.mozURL;
 
 class ReactFacialFeatureTracker extends React.Component {
+  state = {
+    emotion: { emotion: "" }
+  };
 
-	state = {
-		emotion: { emotion: '' }
-	}
+  constructor(props) {
+    super(props);
 
-	constructor(props) {
-		super(props);
+    this.PubSub = props.PubSub || PubSub;
+  }
 
-		this.PubSub = props.PubSub || PubSub;
-	}
+  componentDidMount() {
+    // overlayCC ist im Prinzip eine leere Ebene zum zeichnen, soweit ich das verstanden
+    let overlayCC = this.overlay.getContext("2d");
 
-	componentDidMount() {
+    // Der emotionClassifier wird erstellt und wird mit einem emotionModel initiert.
+    // Der Classifier ist im Prinzip der Rechner
+    // Das emotionModel ist quasi das Wörterbuch für die Werte und die Emotionen
+    let ec = new emotionClassifier();
+    ec.init(emotionModel);
 
-		// overlayCC ist im Prinzip eine leere Ebene zum zeichnen, soweit ich das verstanden
-		let overlayCC = this.overlay.getContext('2d');
+    // wir erstellen hier mal ein Emotion-Wörterbuch was auf null gesetzt ist. Diese Variable wird zum Zwischenspeichern der Werte genutzt.
+    let emotionData = ec.getBlank();
 
-		// Der emotionClassifier wird erstellt und wird mit einem emotionModel initiert.
-		// Der Classifier ist im Prinzip der Rechner
-		// Das emotionModel ist quasi das Wörterbuch für die Werte und die Emotionen
-		let ec = new emotionClassifier();
-		ec.init(emotionModel);
+    // Browser fragt jetzt nach der Webcam
+    // die Funktion braucht folgende Argumente navigator.getUserMedia(optionen, success);
+    getUserMedia({ video: true }, this.getUserMediaCallback.bind(this));
 
-		// wir erstellen hier mal ein Emotion-Wörterbuch was auf null gesetzt ist. Diese Variable wird zum Zwischenspeichern der Werte genutzt.
-		let emotionData = ec.getBlank();
+    //
+    // Hier wird das Tracking an sich implmentiert
+    //
+    let ctrack = new clm.tracker({ useWebGL: true });
 
-		// Browser fragt jetzt nach der Webcam
-		// die Funktion braucht folgende Argumente navigator.getUserMedia(optionen, success);
-		getUserMedia({ video : true}, this.getUserMediaCallback.bind(this) );
+    // der Tracker wird mit dem pModel initiiert. magic! :)
+    ctrack.init(pModel);
 
-		//
-		// Hier wird das Tracking an sich implmentiert
-		//
-		let ctrack = new clm.tracker({useWebGL : true});
+    this.ctrack = ctrack;
+    this.overlayCC = overlayCC;
+    this.ec = ec;
 
-		// der Tracker wird mit dem pModel initiiert. magic! :)
-		ctrack.init(pModel);
+    let self = this;
 
-		this.ctrack = ctrack;
-		this.overlayCC = overlayCC;
-		this.ec = ec;
+    this.video.addEventListener("canplay", this.startVideo.bind(this), false);
+  }
 
-		let self = this;
+  shouldComponentUpdate(nextProps, nextState) {
+    if (this.state.emotion.emotion !== nextState.emotion.emotion) {
+      this.PubSub.publish("emotion.update", nextState.emotion);
 
-		this.video.addEventListener('canplay', (this.startVideo).bind(this), false);
+      return true;
+    }
 
-	}
+    return false;
+  }
 
-	shouldComponentUpdate(nextProps, nextState) {
-		if (this.state.emotion.emotion !== nextState.emotion.emotion) {
-			this.PubSub.publish('emotion.update', nextState.emotion);
+  getUserMediaCallback(err, stream) {
+    // Damit es auch auf allen Browsern funktioniert
+    // technisch wichtig, aber eher unwichtig für das Tracking
+    this.video.src =
+      (window.URL && window.URL.createObjectURL(stream)) || stream;
 
-			return true;
-		}
+    // Um sicher zu gehen, dass das Video auch wirklich abgespielt wird.
+    this.video.play();
+  }
 
-		return false;
-	}
+  startVideo() {
+    // start video
+    this.video.play();
+    // start tracking
+    this.ctrack.start(this.video);
+    // start loop to draw face
+    this.drawLoop();
+  }
 
-	getUserMediaCallback(err, stream ) {
-		// Damit es auch auf allen Browsern funktioniert
-		// technisch wichtig, aber eher unwichtig für das Tracking
-		this.video.src = (window.URL && window.URL.createObjectURL(stream)) || stream;
+  drawLoop() {
+    requestAnimationFrame(this.drawLoop.bind(this));
 
-		// Um sicher zu gehen, dass das Video auch wirklich abgespielt wird.
-		this.video.play();
-	}
+    // Die numerischen Parameter
+    let cp = this.ctrack.getCurrentParameters();
 
-	startVideo(){
+    // bei jedem Frame wird Ebene geleert
+    // Probier mal die untere Zeile auszukommentieren
+    this.overlayCC.clearRect(0, 0, 400, 300);
 
-		// start video
-		this.video.play();
-		// start tracking
-		this.ctrack.start(this.video);
-		// start loop to draw face
-		this.drawLoop();
+    // falls alles geklappt hat und es Emotion-Werte gibt
+    // soll die Maske gezeichnet werden
+    if (this.ctrack.getCurrentPosition()) {
+      //this.ctrack.draw(this.overlay);
+    }
 
-	}
+    // Die Emotionen in darstellbare Form bringen
+    let er = this.ec.meanPredict(cp);
 
-	drawLoop(){
+    if (er) {
+      const emotion = _.maxBy(er, o => {
+        return o.value;
+      });
+      this.setState({ emotion: emotion });
+      this.PubSub.publish("emotions.loop", er);
+    }
+  }
 
-		requestAnimationFrame((this.drawLoop).bind(this));
+  render() {
+    return (
+      <div className="the-video">
+        <video
+          width="400"
+          height="300"
+          controls="false"
+          ref={video => {
+            this.video = video;
+          }}
+        />
 
-		// Die numerischen Parameter
-		let cp = this.ctrack.getCurrentParameters();
-
-		// bei jedem Frame wird Ebene geleert
-		// Probier mal die untere Zeile auszukommentieren
-		this.overlayCC.clearRect(0, 0, 400, 300);
-
-		// falls alles geklappt hat und es Emotion-Werte gibt
-		// soll die Maske gezeichnet werden
-		if (this.ctrack.getCurrentPosition()) {
-			//this.ctrack.draw(this.overlay);
-		}
-
-		// Die Emotionen in darstellbare Form bringen
-		let er = this.ec.meanPredict(cp);
-
-		if (er) {
-			const emotion = _.maxBy(er, (o) => { return o.value; });
-			this.setState({ emotion: emotion });
-			this.PubSub.publish('emotions.loop', er);
-		}
-
-	}
-
-	render() {
-		return (
-			<div className="the-video">
-				<video
-					width="400"
-					height="300"
-					controls="false"
-					ref={ (video) => { this.video = video } } ></video>
-
-				<canvas
-					width="400"
-					height="300"
-					ref={ (canvas) => this.overlay = canvas }></canvas>
-
-			</div>
-		)
-	}
+        <canvas
+          width="400"
+          height="300"
+          ref={canvas => (this.overlay = canvas)}
+        />
+      </div>
+    );
+  }
 }
 
 module.exports = ReactFacialFeatureTracker;
